@@ -1,0 +1,12 @@
+{
+  "name": "pa2-sensor-bridge",
+  "version": "1.0.0",
+  "description": "HTTP-to-WebSocket bridge for iPhone orientation sensor (PA2)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  }
+}

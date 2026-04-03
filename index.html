@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL PA#2 — Tangible Interface (Variant 16)</title>
+
+    <style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background-color: #0a0a0a;
+    color: #E0E0E0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    min-height: 100vh;
+    gap: 16px;
+}
+
+h1 {
+    color: #00FF99;
+    font-size: 2.2em;
+    text-shadow: 0 0 6px #00FF99, 0 0 14px rgba(0,255,153,.45);
+    letter-spacing: 2px;
+    margin-top: 10px;
+}
+
+#message {
+    text-align: center;
+    color: #99FFFF;
+    font-size: 1.05em;
+    line-height: 1.6;
+    background: #161616;
+    padding: 8px 20px;
+    border-radius: 4px;
+    border-left: 3px solid #00FFFF;
+}
+
+#canvas-holder {
+    border: 1px solid #00FFFF;
+    box-shadow: 0 0 18px rgba(0,255,255,.35), 0 0 40px rgba(0,255,153,.08);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #000;
+}
+
+#webglcanvas { display: block; }
+
+/* ── Shared controls panel style ─────────────────────────────────────────── */
+.controls {
+    background: #161616;
+    border-radius: 6px;
+    border: 1px solid #1e1e1e;
+    padding: 16px 22px;
+    width: 620px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.controls.stereo-panel  { border-left: 3px solid #00FF99; }
+.controls.sensor-panel  { border-left: 3px solid #FF8C00; }
+
+.controls-title {
+    font-size: 0.8em;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.stereo-panel .controls-title { color: #00FF99; }
+.sensor-panel .controls-title { color: #FF8C00; }
+
+.control-row {
+    display: grid;
+    grid-template-columns: 180px 1fr 56px;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-row label {
+    color: #99FFFF;
+    font-size: 0.9em;
+}
+
+.control-row input[type="range"] {
+    width: 100%;
+    accent-color: #00FF99;
+    cursor: pointer;
+}
+
+.control-row .val {
+    color: #00FF99;
+    font-size: 0.9em;
+    text-align: right;
+    min-width: 48px;
+}
+
+/* ── Sensor connection row ───────────────────────────────────────────────── */
+.sensor-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sensor-row label {
+    color: #99FFFF;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.sensor-row input[type="text"],
+.sensor-row input[type="number"] {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 3px;
+    color: #E0E0E0;
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 4px 8px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.sensor-row input[type="text"]   { width: 130px; }
+.sensor-row input[type="number"] { width: 70px; }
+
+.sensor-row input:focus { border-color: #FF8C00; }
+
+.btn {
+    padding: 5px 14px;
+    border: none;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.85; }
+
+.btn-connect    { background: #FF8C00; color: #000; font-weight: bold; }
+.btn-disconnect { background: #333;    color: #aaa; }
+
+/* ── Status lines ────────────────────────────────────────────────────────── */
+#camStatus, #sensorStatus {
+    font-size: 0.82em;
+    margin-top: 2px;
+}
+#camStatus    { color: #888; }
+#sensorStatus { color: #888; }
+
+/* ── Info box ────────────────────────────────────────────────────────────── */
+.info-box {
+    background: #0f0f0f;
+    border: 1px solid #1e1e1e;
+    border-left: 3px solid #555;
+    border-radius: 4px;
+    padding: 12px 18px;
+    width: 620px;
+    font-size: 0.8em;
+    color: #777;
+    line-height: 1.8;
+}
+.info-box strong { color: #aaa; }
+
+.hint {
+    font-size: 0.78em;
+    color: #555;
+    text-align: center;
+    margin-top: 2px;
+}
+    </style>
+
+    <script src="./Utils/trackball-rotator.js"></script>
+    <script src="./Utils/m4.js"></script>
+    <script src="./shader.gpu"></script>
+    <script src="./main.js"></script>
+</head>
+
+<body onload="init()">
+
+    <h1>WebGL PA#2</h1>
+
+    <p id="message">
+        Variant 16 &nbsp;|&nbsp; Neovious' Surface &nbsp;|&nbsp;
+        Tangible Interface &nbsp;|&nbsp; Orientation Sensor (ZXY)
+    </p>
+
+    <div id="canvas-holder">
+        <canvas width="600" height="600" id="webglcanvas"></canvas>
+    </div>
+
+    <!-- ── Stereo parameter controls (unchanged from PA1) ──────────────────── -->
+    <div class="controls stereo-panel">
+        <div class="controls-title">Stereo Camera Parameters</div>
+
+        <div class="control-row">
+            <label>Eye Separation</label>
+            <input type="range" id="eyeSep" min="0" max="2" step="0.01" value="0.5">
+            <span class="val" id="eyeSepVal">0.50</span>
+        </div>
+
+        <div class="control-row">
+            <label>Convergence</label>
+            <input type="range" id="convergence" min="1" max="19" step="0.1" value="10">
+            <span class="val" id="convergenceVal">10.0</span>
+        </div>
+
+        <div class="control-row">
+            <label>Field of View</label>
+            <input type="range" id="fov" min="10" max="90" step="1" value="45">
+            <span class="val" id="fovVal">45°</span>
+        </div>
+
+        <div class="control-row">
+            <label>Near Clipping</label>
+            <input type="range" id="nearClip" min="1" max="9.5" step="0.1" value="8">
+            <span class="val" id="nearClipVal">8.0</span>
+        </div>
+
+        <span id="camStatus">🎥 Camera: initializing…</span>
+    </div>
+
+    <!-- ── PA2: Sensor bridge connection panel ─────────────────────────────── -->
+    <div class="controls sensor-panel">
+        <div class="controls-title">📱 Tangible Interface — iPhone Orientation Sensor</div>
+
+        <div class="sensor-row">
+            <label>Bridge IP</label>
+            <input type="text"   id="sensorIP"   placeholder="192.168.1.x" value="">
+            <label>Port</label>
+            <input type="number" id="sensorPort"  value="8765" min="1" max="65535">
+            <button class="btn btn-connect"    id="btnConnect">Connect</button>
+            <button class="btn btn-disconnect" id="btnDisconnect">Disconnect</button>
+        </div>
+
+        <span id="sensorStatus">🔌 Not connected — trackball mode active</span>
+    </div>
+
+    <!-- ── Setup instructions ──────────────────────────────────────────────── -->
+    <div class="info-box">
+        <strong>Setup (iPhone):</strong><br>
+        1. Install <strong>Sensor Logger</strong> (free, App Store) on your iPhone.<br>
+        2. On your PC run: <code>cd bridge &amp;&amp; npm install &amp;&amp; node server.js</code> — note the IP shown.<br>
+        3. In Sensor Logger → <em>Push</em>: enable, set URL to <code>http://&lt;PC_IP&gt;:8765/data</code>, interval 20 ms.<br>
+        4. Enable sensor: <strong>Attitude</strong> (yaw / pitch / roll in radians).<br>
+        5. Enter PC IP above and press <strong>Connect</strong>.<br>
+        6. Tilt your iPhone — the Neovious surface rotates in sync via <strong>ZXY</strong> Euler matrix.
+    </div>
+
+    <p class="hint">
+        When sensor is disconnected: drag to rotate &nbsp;·&nbsp;
+        Red-cyan glasses for stereo effect
+    </p>
+
+</body>
+</html>
