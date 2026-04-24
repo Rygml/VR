@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ControlTask · Variant 20 · Neovious' Surface · AR</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; }
+    #info {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: #00ff99;
+      font-family: 'Courier New', monospace; font-size: 13px;
+      padding: 6px 16px; border-radius: 20px;
+      border: 1px solid #00ff99; z-index: 999; text-align: center;
+      pointer-events: none; white-space: nowrap;
+    }
+  </style>
+
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <script>
+    'use strict';
+
+    const P_MIN = -Math.PI / 2;
+    const P_MAX =  Math.PI / 2;
+    const SCALE = 0.2;
+    const N     = 40;
+
+    function solveThird(a, b, sign) {
+    const ca = Math.cos(a), cb = Math.cos(b);
+    const denom = 3.0 + 4.0 * ca * cb;
+    if (Math.abs(denom) < 1e-6) return null;
+    const arg = -3.0 * (ca + cb) / denom;
+    if (arg < -1.0 || arg > 1.0) return null;
+    return sign > 0 ? Math.acos(arg) : -Math.acos(arg);
+    }
+
+    function mapXYZ(type, p1, p2, third) {
+    if (type === 'Z') return [p1, p2, third];
+    if (type === 'X') return [third, p1, p2];
+    if (type === 'Y') return [p1, third, p2];
+    }
+
+    function buildNeoviousGeometry(THREE) {
+    const positions = [];
+    const colors    = [];
+    const indices   = [];
+    const patches   = ['Z', 'X', 'Y'];
+    const signs     = [+1, -1];
+    const patchColors = [
+        [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0],
+        [1.0, 0.4, 0.0],
+        [0.0, 0.6, 1.0],
+        [0.8, 0.0, 1.0],
+        [0.0, 1.0, 0.4],
+    ];
+
+    let ci = 0, base = 0;
+
+    for (const patchType of patches) {
+        for (const sgn of signs) {
+        const col  = patchColors[ci++];
+        const grid = [];
+
+        for (let i = 0; i < N; i++) {
+            grid[i] = [];
+            const p1 = P_MIN + (P_MAX - P_MIN) * i / (N - 1);
+            for (let j = 0; j < N; j++) {
+            const p2    = P_MIN + (P_MAX - P_MIN) * j / (N - 1);
+            const third = solveThird(p1, p2, sgn);
+            if (third === null) { grid[i][j] = null; continue; }
+            const xyz = mapXYZ(patchType, p1, p2, third);
+            grid[i][j] = { x: xyz[0]*SCALE, y: xyz[2]*SCALE, z: xyz[1]*SCALE };
+            }
+        }
+
+        const vertMap = new Map();
+        let localIdx  = 0;
+
+        for (let i = 0; i < N - 1; i++) {
+            for (let j = 0; j < N - 1; j++) {
+            const v00 = grid[i  ][j  ];
+            const v10 = grid[i+1][j  ];
+            const v01 = grid[i  ][j+1];
+            const v11 = grid[i+1][j+1];
+
+            const addVert = (v, key) => {
+                if (!vertMap.has(key)) {
+                positions.push(v.x, v.y, v.z);
+                colors.push(...col);
+                vertMap.set(key, base + localIdx++);
+                }
+                return vertMap.get(key);
+            };
+
+            if (v00 && v10 && v01) {
+                indices.push(
+                addVert(v00, `${i},${j}`),
+                addVert(v10, `${i+1},${j}`),
+                addVert(v01, `${i},${j+1}`)
+                );
+            }
+            if (v10 && v11 && v01) {
+                indices.push(
+                addVert(v10, `${i+1},${j}`),
+                addVert(v11, `${i+1},${j+1}`),
+                addVert(v01, `${i},${j+1}`)
+                );
+            }
+            }
+        }
+        base += localIdx;
+        }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors,    3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+    }
+
+    AFRAME.registerComponent('neovious-surface', {
+    init: function () {
+        const THREE = window.THREE;
+        const geo   = buildNeoviousGeometry(THREE);
+
+        const fillMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        color: 0x111111,
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
+        }));
+
+        const wireMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        wireframe: true,
+        side: THREE.DoubleSide,
+        }));
+
+        fillMesh.position.y = 0.15;
+        wireMesh.position.y = 0.15;
+
+        this.el.object3D.add(fillMesh);
+        this.el.object3D.add(wireMesh);
+
+        this.fillMesh = fillMesh;
+        this.wireMesh = wireMesh;
+    },
+
+    tick: function (time) {
+        const t = time / 1000;
+        this.fillMesh.rotation.y = t * 0.5;
+        this.wireMesh.rotation.y = t * 0.5;
+    }
+    });
+    </script>
+</head>
+<body>
+
+<div id="info">ControlTask · Variant 20 · Neovious' Surface · AR</div>
+
+<a-scene
+  embedded
+  arjs="sourceType: webcam; debugUIEnabled: false;"
+  vr-mode-ui="enabled: false"
+  renderer="logarithmicDepthBuffer: true; antialias: true;"
+  loading-screen="enabled: false"
+>
+
+  <a-marker
+    type="pattern"
+    url="marker/neovious_text.patt"
+    smooth="true"
+    smoothCount="10"
+    smoothTolerance="0.01"
+    smoothThreshold="5"
+  >
+    <a-entity neovious-surface></a-entity>
+  </a-marker>
+
+  <a-entity camera></a-entity>
+
+</a-scene>
+
+
+</body>
+</html>

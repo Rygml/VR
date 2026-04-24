@@ -1,0 +1,44 @@
+
+// ─── Surface vertex shader ───────────────────────────────────────────────────
+const vertexShaderSource = `
+attribute vec3 vertex;
+uniform mat4 ModelViewProjectionMatrix;
+
+void main() {
+    gl_Position = ModelViewProjectionMatrix * vec4(vertex, 1.0);
+}`;
+
+// ─── Surface fragment shader ──────────────────────────────────────────────────
+const fragmentShaderSource = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+    precision highp float;
+#else
+    precision mediump float;
+#endif
+
+uniform vec4 color;
+void main() {
+    gl_FragColor = color;
+}`;
+
+// ─── Webcam vertex shader (clip-space quad) ───────────────────────────────────
+const webcamVertexShaderSource = `
+attribute vec2 a_position;
+attribute vec2 a_texcoord;
+varying vec2 v_texcoord;
+
+void main() {
+    // z = 0.999 pushes the quad to the far back of NDC
+    gl_Position = vec4(a_position, 0.999, 1.0);
+    v_texcoord  = a_texcoord;
+}`;
+
+// ─── Webcam fragment shader ───────────────────────────────────────────────────
+const webcamFragmentShaderSource = `
+precision mediump float;
+uniform sampler2D u_texture;
+varying vec2 v_texcoord;
+
+void main() {
+    gl_FragColor = texture2D(u_texture, v_texcoord);
+}`;
