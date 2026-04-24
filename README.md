@@ -6,3 +6,5 @@ Practical assignments for the VR course.
 |-------|---------------|-------|
 | PA1 | Anaglyphic Stereo Rendering of Neovious' Surface | [PA1](../../tree/PA1) |
 | PA2 | Tangible Interface — Surface Orientation via Smartphone | [PA2](../../tree/PA2) |
+| CGW | Spatial Audio | [CGW](../../tree/CGW) |
+| CT | AR registration template | [CT](../../tree/ControlTask) |
