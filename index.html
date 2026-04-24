@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL CGW — Spatial Audio (Variant 16)</title>
+    <style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background: #0a0a0a;
+    color: #E0E0E0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    min-height: 100vh;
+    gap: 16px;
+}
+
+h1 {
+    color: #00FF99;
+    font-size: 2.2em;
+    text-shadow: 0 0 6px #00FF99, 0 0 14px rgba(0,255,153,.45);
+    letter-spacing: 2px;
+    margin-top: 10px;
+}
+
+#message {
+    text-align: center;
+    color: #99FFFF;
+    font-size: 1.05em;
+    line-height: 1.6;
+    background: #161616;
+    padding: 8px 20px;
+    border-radius: 4px;
+    border-left: 3px solid #00FFFF;
+}
+
+#canvas-holder {
+    border: 1px solid #00FFFF;
+    box-shadow: 0 0 18px rgba(0,255,255,.35), 0 0 40px rgba(0,255,153,.08);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #000;
+}
+
+#webglcanvas { display: block; }
+
+/* ── Panels ─────────────────────────────────────────────────────────────── */
+.panel {
+    background: #161616;
+    border-radius: 6px;
+    border: 1px solid #1e1e1e;
+    padding: 16px 22px;
+    width: 620px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.panel.p-stereo  { border-left: 3px solid #00FF99; }
+.panel.p-sensor  { border-left: 3px solid #FF8C00; }
+.panel.p-audio   { border-left: 3px solid #AA44FF; }
+.panel.p-filter  { border-left: 3px solid #FF4488; }
+
+.panel-title {
+    font-size: 0.8em;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+.p-stereo .panel-title { color: #00FF99; }
+.p-sensor .panel-title { color: #FF8C00; }
+.p-audio  .panel-title { color: #AA44FF; }
+.p-filter .panel-title { color: #FF4488; }
+
+/* ── Control rows ────────────────────────────────────────────────────────── */
+.ctrl-row {
+    display: grid;
+    grid-template-columns: 180px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+}
+.ctrl-row label { color: #99FFFF; font-size: 0.9em; }
+.ctrl-row input[type="range"] { width: 100%; accent-color: #00FF99; cursor: pointer; }
+.ctrl-row .val  { color: #00FF99; font-size: 0.9em; text-align: right; }
+
+/* ── Inline rows ─────────────────────────────────────────────────────────── */
+.row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.row label { color: #99FFFF; font-size: 0.9em; white-space: nowrap; }
+
+input[type="text"], input[type="number"] {
+    background: #111; border: 1px solid #333; border-radius: 3px;
+    color: #E0E0E0; font-family: inherit; font-size: 0.9em;
+    padding: 4px 8px; outline: none; transition: border-color .2s;
+}
+input[type="text"]   { width: 130px; }
+input[type="number"] { width: 70px; }
+input[type="text"]:focus, input[type="number"]:focus { border-color: #FF8C00; }
+
+input[type="file"] {
+    color: #aaa; font-family: inherit; font-size: 0.85em; cursor: pointer;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+    padding: 5px 14px; border: none; border-radius: 3px;
+    font-family: inherit; font-size: 0.85em; cursor: pointer;
+    transition: opacity .2s;
+}
+.btn:hover   { opacity: 0.85; }
+.btn:disabled { opacity: 0.35; cursor: default; }
+.btn-green   { background: #00CC77; color: #000; font-weight: bold; }
+.btn-orange  { background: #FF8C00; color: #000; font-weight: bold; }
+.btn-purple  { background: #AA44FF; color: #fff; font-weight: bold; }
+.btn-grey    { background: #333;    color: #aaa; }
+
+/* ── Status lines ────────────────────────────────────────────────────────── */
+.status { font-size: 0.82em; color: #888; margin-top: 2px; }
+
+/* ── Checkbox ────────────────────────────────────────────────────────────── */
+.chk-row { display: flex; align-items: center; gap: 10px; }
+.chk-row input[type="checkbox"] { width:16px; height:16px; accent-color: #FF4488; cursor:pointer; }
+.chk-row label { color: #99FFFF; font-size: 0.9em; cursor: pointer; }
+
+.hint { font-size: 0.78em; color: #555; text-align: center; }
+    </style>
+
+    <script src="./Utils/trackball-rotator.js"></script>
+    <script src="./Utils/m4.js"></script>
+    <script src="./shader.gpu"></script>
+    <script src="./main.js"></script>
+</head>
+
+<body onload="init()">
+
+<h1>WebGL CGW</h1>
+
+<p id="message">
+    Variant 16 &nbsp;|&nbsp; Neovious' Surface &nbsp;|&nbsp;
+    Spatial Audio &nbsp;|&nbsp; Low-Pass Filter
+</p>
+
+<div id="canvas-holder">
+    <canvas width="600" height="600" id="webglcanvas"></canvas>
+</div>
+
+<!-- ── Stereo ─────────────────────────────────────────────────────────────── -->
+<div class="panel p-stereo">
+    <div class="panel-title">Stereo Camera Parameters</div>
+
+    <div class="ctrl-row">
+        <label>Eye Separation</label>
+        <input type="range" id="eyeSep" min="0" max="2" step="0.01" value="0.5">
+        <span class="val" id="eyeSepVal">0.50</span>
+    </div>
+    <div class="ctrl-row">
+        <label>Convergence</label>
+        <input type="range" id="convergence" min="1" max="19" step="0.1" value="10">
+        <span class="val" id="convergenceVal">10.0</span>
+    </div>
+    <div class="ctrl-row">
+        <label>Field of View</label>
+        <input type="range" id="fov" min="10" max="90" step="1" value="45">
+        <span class="val" id="fovVal">45°</span>
+    </div>
+    <div class="ctrl-row">
+        <label>Near Clipping</label>
+        <input type="range" id="nearClip" min="1" max="9.5" step="0.1" value="8">
+        <span class="val" id="nearClipVal">8.0</span>
+    </div>
+</div>
+
+<!-- ── Sensor ─────────────────────────────────────────────────────────────── -->
+<div class="panel p-sensor">
+    <div class="panel-title">📱 Tangible Interface — iPhone Orientation Sensor</div>
+    <div class="row">
+        <label>Bridge IP</label>
+        <input type="text"   id="sensorIP"   placeholder="192.168.1.x">
+        <label>Port</label>
+        <input type="number" id="sensorPort" value="8765" min="1" max="65535">
+        <button class="btn btn-orange" id="btnConnect">Connect</button>
+        <button class="btn btn-grey"   id="btnDisconnect">Disconnect</button>
+    </div>
+    <span class="status" id="sensorStatus">🔌 Not connected</span>
+</div>
+
+<!-- ── Audio ──────────────────────────────────────────────────────────────── -->
+<div class="panel p-audio">
+    <div class="panel-title">🎵 Spatial Audio</div>
+    <div class="row">
+        <label>MP3 / OGG file</label>
+        <input type="file" id="audioFile" accept=".mp3,.ogg,.wav">
+        <button class="btn btn-purple" id="btnLoadAudio">Load</button>
+    </div>
+    <div class="row">
+        <button class="btn btn-green" id="btnPlay" disabled>▶ Play</button>
+    </div>
+    <span class="status" id="audioStatus">⬆ Load an audio file to begin</span>
+</div>
+
+<!-- ── Low-Pass Filter (Variant 16) ──────────────────────────────────────── -->
+<div class="panel p-filter">
+    <div class="panel-title">🎛 Low-Pass Filter — Variant 16</div>
+
+    <div class="chk-row">
+        <input type="checkbox" id="chkFilter">
+        <label for="chkFilter">Enable Low-Pass Filter</label>
+    </div>
+
+    <div class="ctrl-row">
+        <label>Cutoff Frequency</label>
+        <input type="range" id="filterFreq" min="80" max="8000" step="10" value="800">
+        <span class="val" id="filterFreqVal">800 Hz</span>
+    </div>
+
+    <span class="status" id="filterStatus">⚪ Low-pass OFF</span>
+</div>
+
+<p class="hint">
+    🔴🔵 Red-cyan glasses for stereo &nbsp;·&nbsp;
+    🟠 Orange sphere = sound source position &nbsp;·&nbsp;
+    Drag canvas to rotate view
+</p>
+
+</body>
+</html>
